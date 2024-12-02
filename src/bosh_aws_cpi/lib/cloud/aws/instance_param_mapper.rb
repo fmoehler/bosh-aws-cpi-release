@@ -92,15 +92,30 @@ module Bosh::AwsCloud
       nic[:groups] = sg unless sg.nil? || sg.empty?
       nic[:subnet_id] = subnet_id if subnet_id
 
-      # only supporting one ip address for now (either ipv4 or ipv6)
-      nic[:ipv_6_addresses] = [{ipv_6_address: private_ipv6_address}] if !private_ipv6_address.nil?
-      nic[:private_ip_address] = private_ip_address if !private_ip_address.nil?
-
       nic[:associate_public_ip_address] = vm_type.auto_assign_public_ip unless vm_type.auto_assign_public_ip.nil?
 
       nic[:device_index] = 0 unless nic.empty?
-      params[:network_interfaces] = [nic] unless nic.empty?
 
+      if !private_ipv6_address.nil? && !private_ip_address.nil?
+        nic2 = nic.clone
+        nic2[:device_index] = 1
+        nic2[:ipv_6_addresses] = [{ipv_6_address: private_ipv6_address}]
+        nic[:private_ip_address] = private_ip_address
+      else
+        if private_ip_address
+          if ipv6_address?(private_ip_address)
+            nic[:ipv_6_addresses] = [{ipv_6_address: private_ip_address}]
+          else
+            nic[:private_ip_address] = private_ip_address
+          end
+        end
+      end
+
+      if !nic2.empty?
+        params[:network_interfaces] = [nic, nic2]
+      else
+        params[:network_interfaces] = [nic] unless nic.empty?
+      end
       params.delete_if { |_k, v| v.nil? }
     end
 
